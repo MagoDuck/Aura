@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Farm ação de Aura - Loja de Auras</title>
+
+<!-- PWA Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FarmAura - Loja">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- Meta tags para compartilhamento -->
+<meta property="og:title" content="Farmação de Aura - Loja">
+<meta property="og:description" content="Personalize sua aura com GIFs exclusivos">
+<meta property="og:type" content="website">
+
+<!-- Registrar Service Worker (caminho correto) -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(registration => {
+          console.log('✅ ServiceWorker registrado com sucesso:', registration.scope);
+          registration.update();
+          
+          if ('sync' in registration) {
+            registration.sync.register('sync-game-data').catch(err => {
+              console.log('Sync não suportado:', err);
+            });
+          }
+        })
+        .catch(error => {
+          console.log('❌ Falha ao registrar ServiceWorker:', error);
+        });
+    });
+  }
+</script>
+
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #050505, #0a0a0a, #000018);
+    color: white;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* MOEDAS NO TOPO */
+  #moedas {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 18px;
+    border-radius: 50px;
+    font-size: clamp(18px, 5vw, 22px);
+    font-weight: bold;
+    border: 2px solid #00eaff;
+    box-shadow: 0 0 12px #00eaff;
+    color: #00eaff;
+    z-index: 10;
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #moedas::before {
+    content: "💰";
+    font-size: 20px;
+  }
+
+  /* Botão voltar */
+  #back-btn {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 18px;
+    border-radius: 50px;
+    font-size: clamp(14px, 4vw, 16px);
+    font-weight: bold;
+    border: 2px solid #ff3333;
+    box-shadow: 0 0 12px #ff3333;
+    color: #ff3333;
+    z-index: 10;
+    backdrop-filter: blur(5px);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #back-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #ff3333;
+  }
+
+  #back-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* Container de cards */
+  .cards-container {
+    margin-top: 100px;
+    margin-bottom: 30px;
+    display: flex;
+    overflow-x: auto;
+    gap: 20px;
+    padding: 20px;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: #00eaff #0d0d0d;
+  }
+
+  .cards-container::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .cards-container::-webkit-scrollbar-track {
+    background: #0d0d0d;
+    border-radius: 10px;
+  }
+
+  .cards-container::-webkit-scrollbar-thumb {
+    background: #00eaff;
+    border-radius: 10px;
+  }
+
+  /* Cards */
+  .card {
+    min-width: min(260px, 80vw);
+    background: linear-gradient(135deg, #0d0d0d, #1a1a2e);
+    padding: 15px;
+    border-radius: 20px;
+    text-align: center;
+    border: 2px solid #7a00ff;
+    box-shadow: 0 0 15px #7a00ff;
+    transition: all 0.3s ease;
+    animation: fadeInUp 0.5s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 25px #7a00ff;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .card img {
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid #00eaff;
+    box-shadow: 0 0 12px #00eaff;
+    transition: transform 0.3s ease;
+  }
+
+  .card img:hover {
+    transform: scale(1.02);
+  }
+
+  .card-footer {
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .price {
+    font-size: clamp(16px, 4vw, 20px);
+    font-weight: bold;
+    color: #ffd700;
+    text-shadow: 0 0 8px #ffdd33;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .price::after {
+    content: "💰";
+    font-size: 18px;
+  }
+
+  button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: clamp(12px, 3.5vw, 14px);
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+    transition: all 0.3s ease;
+    min-width: 100px;
+  }
+
+  button:active {
+    transform: scale(0.95);
+  }
+
+  .comprar {
+    background: linear-gradient(135deg, #00c853, #009624);
+    box-shadow: 0 0 10px #00ff73;
+  }
+
+  .comprar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #00ff73;
+  }
+
+  .equipar {
+    background: linear-gradient(135deg, #2979ff, #0055cc);
+    box-shadow: 0 0 10px #3d8bff;
+  }
+
+  .equipar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #3d8bff;
+  }
+
+  .desequipar {
+    background: linear-gradient(135deg, #b30000, #800000);
+    box-shadow: 0 0 10px #ff1a1a;
+  }
+
+  .desequipar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #ff1a1a;
+  }
+
+  /* Toast de erro */
+  #erroSaldo {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 0, 0, 0.9);
+    color: #ffffff;
+    padding: 12px 24px;
+    font-size: clamp(14px, 4vw, 18px);
+    border: 2px solid #ff4d4d;
+    border-radius: 50px;
+    text-shadow: 0 0 10px red;
+    box-shadow: 0 0 20px red;
+    display: none;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+    font-weight: bold;
+    white-space: nowrap;
+    animation: slideDown 0.3s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  /* Toast de sucesso */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: #00ffea;
+    padding: 10px 20px;
+    border-radius: 50px;
+    font-size: 14px;
+    z-index: 1001;
+    display: none;
+    border: 1px solid #00ffea;
+    backdrop-filter: blur(5px);
+    white-space: nowrap;
+  }
+
+  /* Status de equipado */
+  .equipped-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #00ffea;
+    color: #000;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  /* Responsividade */
+  @media (max-width: 600px) {
+    .cards-container {
+      gap: 15px;
+      padding: 15px;
+    }
+    
+    .card {
+      min-width: 85vw;
+    }
+    
+    button {
+      padding: 8px 16px;
+      min-width: 80px;
+    }
+    
+    #erroSaldo {
+      white-space: normal;
+      text-align: center;
+      max-width: 90%;
+      top: 70px;
+    }
+    
+    #toast {
+      white-space: normal;
+      text-align: center;
+      max-width: 90%;
+      bottom: 20px;
+    }
+  }
+
+  /* Loading animation */
+  .loading {
+    text-align: center;
+    padding: 50px;
+    color: #00eaff;
+    font-size: 20px;
+  }
+
+  /* Título da loja */
+  .store-title {
+    text-align: center;
+    margin-top: 70px;
+    font-size: clamp(24px, 6vw, 32px);
+    color: #ffd700;
+    text-shadow: 0 0 20px gold;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { text-shadow: 0 0 20px gold; }
+    50% { text-shadow: 0 0 40px gold; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MOEDAS -->
+<div id="moedas"></div>
+
+<!-- Botão voltar -->
+<div id="back-btn">← Voltar</div>
+
+<!-- Título -->
+<div class="store-title">🛒 LOJA DE AURAS 🛒</div>
+
+<!-- CARDS -->
+<div class="cards-container" id="cardsContainer"></div>
+
+<!-- TOASTS -->
+<div id="erroSaldo">💰 Saldo Insuficiente!</div>
+<div id="toast"></div>
+
+<script>
+    /* LISTA DE GIFS */
+    const gifs = [
+        { id: "g1", name: "Aura Padrão", src: "Picol.gif", preco: 1, rarity: "comum" },
+        { id: "g2", name: "Aura Shan", src: "Shan.gif", preco: 4, rarity: "incomum" },
+        { id: "g3", name: "Aura Hiso", src: "Hiso.gif", preco: 60, rarity: "raro" },
+        { id: "g4", name: "Aura Lendária", src: "gif4.gif", preco: 300000, rarity: "lendário" }
+    ];
+
+    // Carregar dados
+    let moedas = Number(localStorage.getItem("moedasTotal")) || 0;
+    let compras = JSON.parse(localStorage.getItem("compras")) || {};
+    let equipadoSRC = localStorage.getItem("gifEquipado") || "";
+
+    // Função Toast
+    function showToast(message, isError = false) {
+        const toast = isError ? document.getElementById("erroSaldo") : document.getElementById("toast");
+        toast.textContent = message;
+        toast.style.display = "block";
+        
+        // Se for toast de erro, esconder após 3 segundos
+        if (isError) {
+            setTimeout(() => {
+                toast.style.display = "none";
+            }, 3000);
+        } else {
+            setTimeout(() => {
+                toast.style.display = "none";
+            }, 2000);
+        }
+    }
+
+    // Atualizar display de moedas
+    function atualizarMoedasDisplay() {
+        const moedasElement = document.getElementById("moedas");
+        moedasElement.innerHTML = `${moedas.toFixed(2)}`;
+    }
+
+    // Salvar todos os dados
+    function salvarDados() {
+        localStorage.setItem("moedasTotal", moedas.toFixed(2));
+        localStorage.setItem("compras", JSON.stringify(compras));
+        localStorage.setItem("gifEquipado", equipadoSRC);
+        atualizarMoedasDisplay();
+    }
+
+    // Atualizar todos os botões
+    function atualizarBotoes() {
+        const botoes = document.querySelectorAll("button[data-id]");
+        
+        botoes.forEach(btn => {
+            const id = btn.dataset.id;
+            const gif = gifs.find(g => g.id === id);
+            
+            if (!gif) return;
+            
+            const possui = compras[id] === true;
+            const estaEquipado = equipadoSRC === gif.src;
+            
+            if (!possui) {
+                btn.className = "comprar";
+                btn.innerText = "💰 Comprar";
+                btn.disabled = false;
+            } else if (estaEquipado) {
+                btn.className = "desequipar";
+                btn.innerText = "❌ Desequipar";
+                btn.disabled = false;
+            } else {
+                btn.className = "equipar";
+                btn.innerText = "⚡ Equipar";
+                btn.disabled = false;
+            }
+        });
+        
+        // Adicionar badge de equipado nos cards
+        document.querySelectorAll('.card').forEach(card => {
+            const img = card.querySelector('img');
+            const existingBadge = card.querySelector('.equipped-badge');
+            if (existingBadge) existingBadge.remove();
+            
+            if (img && img.src.includes(equipadoSRC) && equipadoSRC) {
+                const badge = document.createElement('div');
+                badge.className = 'equipped-badge';
+                badge.innerHTML = '✓ EQUIPADO';
+                card.style.position = 'relative';
+                card.appendChild(badge);
+            }
+        });
+    }
+
+    // Criar cards
+    function criarCards() {
+        const container = document.getElementById("cardsContainer");
+        container.innerHTML = '';
+        
+        gifs.forEach((gif, index) => {
+            const card = document.createElement("div");
+            card.classList.add("card");
+            card.style.animationDelay = `${index * 0.1}s`;
+            
+            const possui = compras[gif.id] === true;
+            const estaEquipado = equipadoSRC === gif.src;
+            
+            let textoBotao = "💰 Comprar";
+            let classeBotao = "comprar";
+            
+            if (possui) {
+                textoBotao = "⚡ Equipar";
+                classeBotao = "equipar";
+            }
+            if (estaEquipado) {
+                textoBotao = "❌ Desequipar";
+                classeBotao = "desequipar";
+            }
+            
+            // Raridade emoji
+            const rarityEmoji = {
+                'comum': '⚪',
+                'incomum': '🟢',
+                'raro': '🔵',
+                'lendário': '🟣'
+            };
+            
+            card.innerHTML = `
+                <img src="${gif.src}" alt="${gif.name}" loading="lazy">
+                <div class="card-footer">
+                    <div class="price">
+                        ${rarityEmoji[gif.rarity]} ${gif.preco}
+                    </div>
+                    <button 
+                        class="${classeBotao}" 
+                        data-id="${gif.id}"
+                        onclick="acao('${gif.id}')"
+                    >
+                        ${textoBotao}
+                    </button>
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #888;">${gif.name}</div>
+            `;
+            
+            container.appendChild(card);
+        });
+        
+        atualizarBotoes();
+    }
+
+    // Função principal de ação (comprar/equipar/desequipar)
+    window.acao = function(id) {
+        const gif = gifs.find(g => g.id === id);
+        if (!gif) return;
+        
+        const possui = compras[id] === true;
+        
+        // COMPRAR
+        if (!possui) {
+            if (moedas < gif.preco) {
+                showToast(`💰 Saldo insuficiente! Você tem ${moedas.toFixed(2)} moedas`, true);
+                return;
+            }
+            
+            moedas -= gif.preco;
+            compras[id] = true;
+            
+            salvarDados();
+            showToast(`✅ Você comprou ${gif.name}!`, false);
+            
+            // Atualizar botões
+            atualizarBotoes();
+            return;
+        }
+        
+        // JÁ POSSUI - EQUIPAR ou DESEQUIPAR
+        if (equipadoSRC === gif.src) {
+            // DESEQUIPAR
+            equipadoSRC = "";
+            salvarDados();
+            showToast(`🔓 ${gif.name} foi desequipado`, false);
+        } else {
+            // EQUIPAR
+            equipadoSRC = gif.src;
+            salvarDados();
+            showToast(`✨ ${gif.name} equipado com sucesso! ✨`, false);
+        }
+        
+        atualizarBotoes();
+    };
+
+    // Botão voltar
+    document.getElementById("back-btn").onclick = () => {
+        window.location.href = "index.html";
+    };
+
+    // Prevenir cache de imagens
+    function preloadImages() {
+        gifs.forEach(gif => {
+            const img = new Image();
+            img.src = gif.src;
+        });
+    }
+
+    // Inicializar
+    function init() {
+        atualizarMoedasDisplay();
+        criarCards();
+        preloadImages();
+        
+        // Verificar se há algum GIF equipado e aplicar
+        if (equipadoSRC) {
+            console.log("🎨 GIF equipado:", equipadoSRC);
+        }
+        
+        // Salvar dados periodicamente
+        setInterval(() => {
+            if (moedas !== Number(localStorage.getItem("moedasTotal"))) {
+                salvarDados();
+            }
+        }, 5000);
+        
+        // Detectar conexão
+        window.addEventListener('online', () => {
+            showToast("📡 Conexão restaurada!", false);
+        });
+        
+        window.addEventListener('offline', () => {
+            showToast("⚠️ Sem conexão - modo offline", true);
+        });
+    }
+    
+    // Iniciar
+    init();
+</script>
+
+</body>
+</html>

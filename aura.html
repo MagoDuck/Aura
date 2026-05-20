@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Farm ação de Aura - Jogo Principal</title>
+
+<!-- PWA Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FarmAura - Jogo">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- Meta tags para compartilhamento -->
+<meta property="og:title" content="Farmação de Aura">
+<meta property="og:description" content="Jogo idle incremental de aura">
+<meta property="og:type" content="game">
+
+<!-- Registrar Service Worker (caminho correto) -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(registration => {
+          console.log('✅ ServiceWorker registrado com sucesso:', registration.scope);
+          registration.update();
+          
+          if ('sync' in registration) {
+            registration.sync.register('sync-game-data').catch(err => {
+              console.log('Sync não suportado:', err);
+            });
+          }
+        })
+        .catch(error => {
+          console.log('❌ Falha ao registrar ServiceWorker:', error);
+        });
+    });
+  }
+</script>
+
+<style>
+  * {
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    user-select: none;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+
+  #bg-gif {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(480px, 90vw);
+    opacity: 0.85;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* SCORE E RECORDE */
+  #score, #highscore {
+    position: absolute;
+    left: 10px;
+    font-weight: bold;
+    z-index: 10;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 15px;
+    border-radius: 25px;
+    backdrop-filter: blur(5px);
+  }
+
+  #score {
+    top: 10px;
+    font-size: clamp(18px, 5vw, 25px);
+    color: #0ff;
+    text-shadow: 0 0 10px #0ff;
+  }
+
+  #highscore {
+    top: 60px;
+    font-size: clamp(14px, 4vw, 20px);
+    color: #ffd700;
+    text-shadow: 0 0 15px #ffea00;
+  }
+
+  #gameover {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: clamp(30px, 8vw, 52px);
+    font-weight: bold;
+    color: red;
+    text-shadow: 0 0 15px red;
+    display: none;
+    z-index: 50;
+    text-align: center;
+    background: rgba(0,0,0,0.9);
+    padding: 30px;
+    border-radius: 20px;
+    min-width: 280px;
+    backdrop-filter: blur(10px);
+    animation: fadeIn 0.5s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  #coins-earned, #coins-total {
+    display: none;
+    font-size: clamp(18px, 5vw, 28px);
+    margin-top: 12px;
+    color: #ffd700;
+    text-shadow: 0 0 12px gold;
+  }
+
+  /* ABA INFERIOR */
+  #bottom-bar {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 80px;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0 8px;
+    box-sizing: border-box;
+    z-index: 20;
+    gap: 15px;
+    border-top: 1px solid rgba(0,255,234,0.3);
+  }
+
+  .btn {
+    padding: 12px 22px;
+    background: transparent;
+    border: 2px solid;
+    font-size: clamp(14px, 4vw, 20px);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    min-width: 100px;
+  }
+
+  .btn:active {
+    transform: scale(0.95);
+  }
+
+  .btn-pause { 
+    border-color: #ffea00; 
+    color: #ffea00; 
+    text-shadow: 0 0 10px #ffea00;
+    box-shadow: 0 0 15px #ffea00;
+  }
+
+  .btn-pause:hover {
+    box-shadow: 0 0 25px #ffea00;
+    transform: scale(1.05);
+  }
+
+  .btn-restart {
+    border-color: #00ffea;
+    color: #00ffea;
+    text-shadow: 0 0 10px #00ffea;
+    box-shadow: 0 0 15px #00ffea;
+  }
+
+  .btn-restart:hover {
+    box-shadow: 0 0 25px #00ffea;
+    transform: scale(1.05);
+  }
+
+  .btn-exit {
+    border-color: #ff3333;
+    color: #ff3333;
+    text-shadow: 0 0 10px #ff3333;
+    box-shadow: 0 0 15px #ff3333;
+  }
+
+  .btn-exit:hover {
+    box-shadow: 0 0 25px #ff3333;
+    transform: scale(1.05);
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  /* JANELA DE PAUSE */
+  #pause-window {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(350px, 90%);
+    padding: 25px;
+    background: rgba(0,0,0,0.95);
+    border: 3px solid #ffd700;
+    border-radius: 20px;
+    text-align: center;
+    display: none;
+    z-index: 100;
+    box-shadow: 0 0 25px gold;
+    backdrop-filter: blur(10px);
+    animation: fadeIn 0.3s ease;
+  }
+
+  #pause-window h2 {
+    color: #ffd700;
+    text-shadow: 0 0 15px gold;
+    margin-bottom: 20px;
+    font-size: clamp(24px, 6vw, 32px);
+  }
+
+  .pause-btn {
+    padding: 12px 20px;
+    margin: 8px 0;
+    width: 90%;
+    font-size: clamp(16px, 4vw, 22px);
+    background: transparent;
+    border: 2px solid;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-shadow: 0 0 8px currentColor;
+    font-weight: bold;
+  }
+
+  .pause-btn:active {
+    transform: scale(0.98);
+  }
+
+  .btn-continuar {
+    border-color: #00ff00;
+    color: #00ff00;
+  }
+
+  .btn-reiniciar {
+    border-color: #00ffea;
+    color: #00ffea;
+  }
+
+  .btn-voltar {
+    border-color: #ff3333;
+    color: #ff3333;
+  }
+
+  /* BOLAS */
+  .ball, .ball-ego, .ball-morte {
+    position: absolute;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 5;
+    transition: transform 0.05s ease;
+    will-change: top, left;
+  }
+
+  .ball:active, .ball-ego:active, .ball-morte:active {
+    transform: scale(0.95);
+  }
+
+  .ball {
+    width: min(85px, 20vw);
+    height: min(85px, 20vw);
+    background: radial-gradient(circle, #fff, #aaa);
+    box-shadow: 0 0 20px white;
+  }
+
+  .ball-ego {
+    width: min(90px, 22vw);
+    height: min(90px, 22vw);
+    background: radial-gradient(circle, #b300ff, #5a0096);
+    box-shadow: 0 0 25px #b300ff, 0 0 50px #b300ff;
+    animation: pulse-glow 1s infinite;
+  }
+
+  .ball-morte {
+    width: min(85px, 20vw);
+    height: min(85px, 20vw);
+    background: radial-gradient(circle, #ff0000, #7a0000);
+    box-shadow: 0 0 25px red, 0 0 50px red;
+    animation: pulse-red 0.5s infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 25px #b300ff, 0 0 50px #b300ff; }
+    50% { box-shadow: 0 0 40px #b300ff, 0 0 80px #b300ff; }
+  }
+
+  @keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 25px red, 0 0 50px red; }
+    50% { box-shadow: 0 0 45px red, 0 0 90px red; }
+  }
+
+  /* Toast para notificações */
+  #toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.9);
+    color: #00ffea;
+    padding: 10px 20px;
+    border-radius: 50px;
+    font-size: 14px;
+    z-index: 1001;
+    display: none;
+    border: 1px solid #00ffea;
+    white-space: nowrap;
+    backdrop-filter: blur(5px);
+  }
+
+  @media (max-width: 600px) {
+    #toast {
+      white-space: normal;
+      text-align: center;
+      max-width: 90%;
+      font-size: 12px;
+    }
+    .btn {
+      padding: 8px 16px;
+      min-width: 80px;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<img id="bg-gif" alt="Background">
+<div id="toast"></div>
+<div id="score">+0Aura</div>
+<div id="highscore">🏆 Recorde: 0</div>
+
+<div id="gameover">
+  💀 Você foi Mogado 💀
+  <div id="coins-earned"></div>
+  <div id="coins-total"></div>
+</div>
+
+<!-- ABA INFERIOR -->
+<div id="bottom-bar">
+  <button class="btn btn-pause" id="pause-btn">⏸️ Pause</button>
+  <button class="btn btn-restart hidden" id="restart-btn">🔄 Reiniciar</button>
+  <button class="btn btn-exit hidden" id="exit-btn">🚪 Sair</button>
+</div>
+
+<!-- JANELA DE PAUSE -->
+<div id="pause-window">
+  <h2>⏸️ Jogo Pausado</h2>
+  <button class="pause-btn btn-continuar">▶️ Continuar</button>
+  <button class="pause-btn btn-reiniciar">🔄 Reiniciar</button>
+  <button class="pause-btn btn-voltar">🚪 Sair</button>
+</div>
+
+<script>
+  // Carregar GIF salvo
+  let gifEquipado = localStorage.getItem("gifEquipado") || "Picol.gif";
+  document.getElementById("bg-gif").src = gifEquipado;
+
+  // Variáveis do jogo
+  let score = 0;
+  let highscore = Number(localStorage.getItem("highscore")) || 0;
+  let moedasTotal = Number(localStorage.getItem("moedasTotal")) || 0;
+  let gameOver = false;
+  let paused = false;
+  let spawnInterval;
+  let egoMode = false;
+  let egoSuperior = false;
+  let egoCount = 0;
+  let spawnSpeed = 1550;
+  const spawnAcceleration = 0.98;
+  const clickSound = new Audio("bub.mp3");
+  let activeBalls = [];
+
+  // Elementos DOM
+  const pauseBtn = document.getElementById('pause-btn');
+  const restartBtn = document.getElementById('restart-btn');
+  const exitBtn = document.getElementById('exit-btn');
+  const gameOverMsg = document.getElementById('gameover');
+  const pauseWindow = document.getElementById('pause-window');
+
+  // Função Toast
+  function showToast(message, duration = 2000) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, duration);
+  }
+
+  // Mostrar recorde
+  document.getElementById("highscore").innerHTML = "🏆 Recorde: " + highscore;
+
+  // Funções do jogo
+  function togglePause() {
+    if (gameOver) return;
+    paused = !paused;
+
+    if (paused) {
+      clearTimeout(spawnInterval);
+      pauseAllBalls();
+      pauseWindow.style.display = "block";
+      showToast("⏸️ Jogo pausado", 1000);
+    } else {
+      pauseWindow.style.display = "none";
+      resumeAllBalls();
+      startSpawning();
+      showToast("▶️ Jogo retomado", 1000);
+    }
+  }
+
+  function showGameOverButtons() {
+    pauseBtn.classList.add('hidden');
+    restartBtn.classList.remove('hidden');
+    exitBtn.classList.remove('hidden');
+    document.getElementById('bottom-bar').style.justifyContent = 'center';
+    document.getElementById('bottom-bar').style.gap = '20px';
+  }
+
+  function pauseAllBalls() {
+    activeBalls.forEach(ballData => {
+      clearInterval(ballData.intervalId);
+    });
+  }
+
+  function resumeAllBalls() {
+    activeBalls.forEach(ballData => {
+      if (!ballData.element.parentElement) return;
+      
+      const ball = ballData.element;
+      const fallSpeed = ballData.fallSpeed;
+      const ballDataRef = ballData;
+      
+      ballDataRef.intervalId = setInterval(() => {
+        if (gameOver || paused) return;
+
+        ball.style.top = parseFloat(ball.style.top) + fallSpeed + "px";
+
+        const bottomBarHeight = 80;
+        if (parseFloat(ball.style.top) > window.innerHeight - bottomBarHeight) {
+          clearInterval(ballDataRef.intervalId);
+          ball.remove();
+          const index = activeBalls.indexOf(ballDataRef);
+          if (index > -1) activeBalls.splice(index, 1);
+          
+          const isEgo = ball.classList.contains('ball-ego');
+          const isMorte = ball.classList.contains('ball-morte');
+          
+          if (!isEgo && !isMorte) {
+            score -= 10;
+            updateScore();
+          }
+        }
+      }, 16);
+    });
+  }
+
+  function updateHighscore() {
+    if (score > highscore) {
+      highscore = score;
+      localStorage.setItem("highscore", highscore);
+      document.getElementById("highscore").innerHTML = "🏆 Recorde: " + highscore;
+      showToast("🎉 NOVO RECORDE! 🎉", 2000);
+    }
+  }
+
+  function updateScore() {
+    const s = document.getElementById("score");
+    updateHighscore();
+
+    if (score < 0) {
+      s.style.color = "red";
+      s.style.textShadow = "0 0 10px red, 0 0 20px #ff4d4d";
+      s.innerHTML = score + "Aura 😢";
+      if (score <= -100 && !gameOver) triggerGameOver();
+      return;
+    }
+
+    if (score >= 1000000) {
+      const msg = document.getElementById("gameover");
+      msg.innerHTML = "✨ AURA DEFINITIVA ✨<div id='coins-earned'></div><div id='coins-total'></div>";
+      msg.style.color = "#ffd700";
+      msg.style.textShadow = "0 0 20px gold, 0 0 40px yellow";
+      msg.style.display = "block";
+      gameOver = true;
+      showGameOverButtons();
+      s.style.color = "#ffd700";
+      s.style.textShadow = "0 0 25px gold";
+      s.innerHTML = "🏆 1.000.000 Aura Definitiva 🏆";
+      return;
+    }
+
+    let auraNome = "";
+    let cor = "";
+    let brilho = "";
+
+    if (score >= 195000) { auraNome = "Aura Absoluta"; cor = "#ffd700"; brilho = "0 0 20px gold"; }
+    else if (score >= 180000) { auraNome = "Aura Divina"; cor = "#ffd700"; brilho = "0 0 25px #fff000"; }
+    else if (score >= 165000) { auraNome = "Aura Suprema"; cor = "red"; brilho = "0 0 20px red"; }
+    else if (score >= 150000) { auraNome = "Aura Titânica"; cor = "orange"; brilho = "0 0 20px orange"; }
+    else if (score >= 140000) { auraNome = "Aura Descomunal"; cor = "#0011aa"; brilho = "0 0 25px #0044ff"; }
+    else if (score >= 130000) { auraNome = "Aura Colossal"; cor = "#8000ff"; brilho = "0 0 25px #a200ff"; }
+    else if (score >= 120000) { auraNome = "Aura Mítica"; cor = "#d9d9d9"; brilho = "0 0 25px white"; }
+    else if (score >= 110000) { auraNome = "Aura Lendária"; cor = "#ff66cc"; brilho = "0 0 25px #ff99dd"; }
+    else if (score >= 100000) { auraNome = "Aura Extrema"; cor = "#66ccff"; brilho = "0 0 25px #99ddff"; }
+    else if (score >= 50000) { auraNome = "Aura Máxima"; cor = "red"; brilho = "0 0 20px red"; }
+    else if (score >= 20000) { auraNome = "Aura Superior"; cor = "yellow"; brilho = "0 0 20px yellow"; }
+    else if (score >= 10000) { auraNome = "Aura Elevada"; cor = "orange"; brilho = "0 0 20px orange"; }
+    else if (score >= 5000) { auraNome = "Aura Despertada"; cor = "lime"; brilho = "0 0 20px lime"; }
+    else if (score >= 1000) { auraNome = "Aura Forte"; cor = "#003399"; brilho = "0 0 20px #0055ff"; }
+    else {
+      if (!egoMode) {
+        s.style.color = "#00ffea";
+        s.style.textShadow = "0 0 10px #00faff";
+        s.innerHTML = "✨ +" + score + " Aura ✨";
+        return;
+      } else if (!egoSuperior) {
+        s.style.color = "#b300ff";
+        s.style.textShadow = "0 0 20px #b300ff";
+        s.innerHTML = "⚡ +" + score + " Aura + Ego ⚡";
+        return;
+      } else {
+        s.style.color = "#ffd700";
+        s.style.textShadow = "0 0 25px white";
+        s.innerHTML = "🌟 +" + score + " Aura + Ego Superior 🌟";
+        return;
+      }
+    }
+
+    s.style.color = cor;
+    s.style.textShadow = brilho;
+
+    if (!egoMode) s.innerHTML = "✨ +" + score + " " + auraNome + " ✨";
+    else if (!egoSuperior) s.innerHTML = "⚡ +" + score + " " + auraNome + " + Ego ⚡";
+    else s.innerHTML = "🌟 +" + score + " " + auraNome + " + Ego Superior 🌟";
+  }
+
+  function triggerGameOver() {
+    gameOver = true;
+    
+    let moedasGanhas = score / 100;
+    if (moedasGanhas < 0) moedasGanhas = 0;
+    moedasGanhas = Number(moedasGanhas.toFixed(2));
+    
+    moedasTotal += moedasGanhas;
+    localStorage.setItem("moedasTotal", Number(moedasTotal.toFixed(2)));
+    
+    showGameOverButtons();
+    clearAllBalls();
+    
+    if (paused) {
+      paused = false;
+      pauseWindow.style.display = "none";
+    }
+    
+    const coinsDiv = document.getElementById("coins-earned");
+    const totalDiv = document.getElementById("coins-total");
+    coinsDiv.style.display = "block";
+    totalDiv.style.display = "block";
+    coinsDiv.innerHTML = "🪙 Moedas ganhas: " + moedasGanhas;
+    totalDiv.innerHTML = "💰 Total: " + Number(moedasTotal.toFixed(2));
+    
+    gameOverMsg.style.display = "block";
+    showToast("💀 Game Over! Você foi mogado!", 3000);
+  }
+
+  function clearAllBalls() {
+    activeBalls.forEach(ballData => clearInterval(ballData.intervalId));
+    activeBalls = [];
+    document.querySelectorAll('.ball, .ball-ego, .ball-morte').forEach(ball => ball.remove());
+  }
+
+  function getSafeXPosition(ballSize) {
+    const margin = 10;
+    const maxX = window.innerWidth - ballSize - margin;
+    return Math.max(margin, Math.random() * (maxX - margin) + margin);
+  }
+
+  function createBall() {
+    if (gameOver || paused) return;
+
+    const ball = document.createElement("div");
+    const spawnEgo = (score >= 500 || egoMode) && Math.random() < 0.05;
+    const spawnMorte = Math.random() < 0.05;
+
+    if (spawnMorte) ball.className = "ball-morte";
+    else if (spawnEgo) ball.className = "ball-ego";
+    else ball.className = "ball";
+
+    const ballSize = spawnEgo || spawnMorte ? 90 : 85;
+    const sizePx = window.innerWidth < 600 ? (spawnEgo || spawnMorte ? '22vw' : '20vw') : (spawnEgo || spawnMorte ? '90px' : '85px');
+    ball.style.width = sizePx;
+    ball.style.height = sizePx;
+    ball.style.left = getSafeXPosition(parseInt(sizePx)) + "px";
+    ball.style.top = "-100px";
+
+    document.body.appendChild(ball);
+
+    let fallSpeed = spawnEgo ? 12 + Math.random() * 6 : 2 + Math.random() * 2;
+
+    const ballData = {
+      element: ball,
+      fallSpeed: fallSpeed,
+      intervalId: null,
+      isEgo: spawnEgo,
+      isMorte: spawnMorte
+    };
+
+    ballData.intervalId = setInterval(() => {
+      if (gameOver || paused) return;
+      
+      let currentTop = parseFloat(ball.style.top);
+      ball.style.top = currentTop + fallSpeed + "px";
+      
+      const bottomBarHeight = 80;
+      if (currentTop + fallSpeed > window.innerHeight - bottomBarHeight) {
+        clearInterval(ballData.intervalId);
+        ball.remove();
+        const index = activeBalls.indexOf(ballData);
+        if (index > -1) activeBalls.splice(index, 1);
+        
+        if (!spawnEgo && !spawnMorte) {
+          score -= 10;
+          updateScore();
+        }
+      }
+    }, 16);
+
+    activeBalls.push(ballData);
+
+    ball.onclick = (e) => {
+      e.stopPropagation();
+      if (gameOver || paused) return;
+      
+      clickSound.currentTime = 0;
+      clickSound.play().catch(e => console.log('Áudio não pode ser reproduzido'));
+      
+      clearInterval(ballData.intervalId);
+      const index = activeBalls.indexOf(ballData);
+      if (index > -1) activeBalls.splice(index, 1);
+      ball.remove();
+      
+      if (spawnMorte) {
+        triggerGameOver();
+        return;
+      }
+      
+      if (spawnEgo) {
+        score += 100;
+        if (!egoMode) egoMode = true;
+        if (++egoCount >= 10) egoSuperior = true;
+        showToast("💜 +100 Aura + Ego!", 500);
+      } else {
+        score += 10;
+      }
+      
+      updateScore();
+    };
+  }
+
+  function startSpawning() {
+    if (gameOver || paused) return;
+    createBall();
+    if (!gameOver && !paused) {
+      spawnSpeed = Math.max(750, spawnSpeed * spawnAcceleration);
+      spawnInterval = setTimeout(startSpawning, spawnSpeed);
+    }
+  }
+
+  function reiniciar() {
+    clearTimeout(spawnInterval);
+    clearAllBalls();
+    location.reload();
+  }
+
+  function voltar() {
+    clearTimeout(spawnInterval);
+    clearAllBalls();
+    window.location.href = "index.html";
+  }
+
+  // Event Listeners
+  pauseBtn.onclick = togglePause;
+  restartBtn.onclick = reiniciar;
+  exitBtn.onclick = voltar;
+  
+  document.querySelector('.btn-continuar').onclick = togglePause;
+  document.querySelector('.btn-reiniciar').onclick = reiniciar;
+  document.querySelector('.btn-voltar').onclick = voltar;
+
+  // Prevenir scroll na tela
+  document.body.addEventListener('touchmove', (e) => {
+    if (e.target === document.body) e.preventDefault();
+  }, { passive: false });
+
+  // Inicializar jogo
+  updateScore();
+  startSpawning();
+  
+  // Salvar estado periodicamente
+  setInterval(() => {
+    if (!gameOver && score > 0) {
+      localStorage.setItem("scoreTemp", score);
+    }
+  }, 5000);
+</script>
+
+</body>
+</html>

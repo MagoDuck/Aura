@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="google-site-verification" content="WCTEH1aN_fqsNeHy5KVLco5-7yoe2pwT4f5ionAxZTs" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  
+  <title>Farm ação de Aura - Jogo Idle Incremental</title>
+
+  <meta name="description" content="Farmação de Aura é um jogo idle incremental onde você acumula moedas, evolui sua aura e desbloqueia melhorias progressivas. Jogue online grátis.">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="Farmação de Aura">
+  <meta name="keywords" content="jogo idle, jogo incremental, jogo de aura, farmar aura, jogo online grátis, idle game brasileiro">
+
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FarmAura">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: light)">
+  <meta name="mobile-web-app-capable" content="yes">
+  
+  <!-- Preconnect para performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Fundo animado */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(0,255,234,0.1) 0%, rgba(0,0,0,1) 100%);
+      animation: rotate 20s linear infinite;
+      z-index: -1;
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    #moedasDisplay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #00ffea;
+      font-size: 26px;
+      font-weight: bold;
+      text-shadow: 0 0 10px #00ffea, 0 0 20px #00ffea;
+      background: rgba(0,0,0,0.7);
+      padding: 10px 20px;
+      border-radius: 50px;
+      backdrop-filter: blur(5px);
+      z-index: 10;
+    }
+
+    h1 {
+      font-size: clamp(40px, 10vw, 80px);
+      color: #ff0000;
+      text-shadow: 
+        0 0 10px #ff0000,
+        0 0 20px #ff0000,
+        0 0 40px #b30000,
+        0 0 80px #800000;
+      margin-bottom: 30px;
+      animation: pulse-glow 2s infinite;
+      z-index: 10;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 40px #b30000, 0 0 80px #800000; }
+      50% { text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000, 0 0 60px #b30000, 0 0 100px #800000; }
+    }
+
+    .btn-container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .btn {
+      padding: 15px 40px;
+      font-size: clamp(20px, 5vw, 30px);
+      color: #00fff2;
+      background: rgba(0,0,0,0.8);
+      border: 3px solid #00fff2;
+      border-radius: 50px;
+      cursor: pointer;
+      text-shadow: 0 0 10px #00fff2, 0 0 20px #00fff2;
+      box-shadow: 0 0 10px #00fff2, 0 0 20px #00fff2, inset 0 0 10px #00fff2;
+      transition: all 0.3s ease;
+      font-weight: bold;
+      backdrop-filter: blur(5px);
+      min-width: 150px;
+    }
+
+    .btn:hover {
+      box-shadow: 
+        0 0 20px #00fff2,
+        0 0 40px #00fff2,
+        0 0 60px #00fff2,
+        inset 0 0 20px #00fff2;
+      transform: scale(1.05);
+      background: rgba(0,0,0,0.9);
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Versão mobile */
+    @media (max-width: 768px) {
+      .btn {
+        padding: 12px 30px;
+        min-width: 130px;
+      }
+      
+      #moedasDisplay {
+        font-size: 20px;
+        top: 10px;
+        left: 10px;
+      }
+    }
+
+    /* Botão de instalação PWA */
+    #install-prompt {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #00ffea, #0088ff);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 50px;
+      cursor: pointer;
+      z-index: 1000;
+      font-weight: bold;
+      box-shadow: 0 0 20px rgba(0,255,234,0.5);
+      display: none;
+      animation: slide-up 0.5s ease, pulse 2s infinite;
+      font-size: 16px;
+      gap: 10px;
+      align-items: center;
+      border: none;
+      transition: transform 0.3s;
+    }
+
+    #install-prompt:hover {
+      transform: translateX(-50%) scale(1.05);
+    }
+
+    @keyframes slide-up {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(0,255,234,0.5); }
+      50% { box-shadow: 0 0 40px rgba(0,255,234,0.8); }
+    }
+
+    /* Toast de notificação */
+    #toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.9);
+      color: #00ffea;
+      padding: 12px 24px;
+      border-radius: 50px;
+      font-size: 14px;
+      z-index: 1001;
+      display: none;
+      border: 1px solid #00ffea;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 600px) {
+      #toast {
+        white-space: normal;
+        text-align: center;
+        max-width: 90%;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="moedasDisplay">🪙 0</div>
+
+  <h1>⚡ FARM AÇÃO DE AURA ⚡</h1>
+
+  <div class="btn-container">
+    <button class="btn" onclick="startGame()">🎮 INICIAR</button>
+    <button class="btn" onclick="editar()">🎨 EDITAR</button>
+  </div>
+
+  <div id="install-prompt">
+    📱 Instalar App Farmação de Aura
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // Função para mostrar toast
+    function showToast(message, duration = 3000) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, duration);
+    }
+
+    // Navegação
+    function startGame() {
+      window.location.href = "aura.html";
+    }
+
+    function editar() {
+      window.location.href = "editar.html";
+    }
+
+    // Carregar moedas
+    let moedasTotal = Number(localStorage.getItem("moedasTotal")) || 0;
+    document.getElementById("moedasDisplay").innerHTML = "🪙 " + moedasTotal.toFixed(2);
+
+    // ==================== PWA ====================
+    
+    // Registrar Service Worker (caminho correto)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('sw.js');
+          console.log('✅ ServiceWorker registrado com sucesso:', registration.scope);
+          
+          // Verificar atualizações
+          registration.update();
+          
+          // Verificar se há novo service worker
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            console.log('🔄 Novo ServiceWorker encontrado!');
+            
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                showToast('🔄 Nova versão disponível! Atualize a página.', 5000);
+              }
+            });
+          });
+          
+          // Registrar sync para dados offline
+          if ('sync' in registration) {
+            try {
+              await registration.sync.register('sync-game-data');
+              console.log('✅ Sync registrado');
+            } catch (err) {
+              console.log('Sync não suportado:', err);
+            }
+          }
+          
+          // Verificar se está rodando como PWA instalado
+          if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('🎮 App rodando em modo standalone (PWA)');
+            document.body.classList.add('pwa-mode');
+          }
+          
+        } catch (error) {
+          console.log('❌ Falha ao registrar ServiceWorker:', error);
+        }
+      });
+    }
+
+    // PWA Installation
+    let deferredPrompt;
+    let isInstalled = false;
+
+    // Detectar se já está instalado
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      isInstalled = true;
+    }
+
+    // Evento beforeinstallprompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      if (isInstalled) return;
+      
+      e.preventDefault();
+      deferredPrompt = e;
+      
+      // Mostrar botão de instalação personalizado
+      const installBtn = document.getElementById('install-prompt');
+      installBtn.style.display = 'flex';
+      
+      // Animação de entrada
+      installBtn.style.animation = 'slide-up 0.5s ease';
+      
+      installBtn.onclick = async () => {
+        if (!deferredPrompt) return;
+        
+        installBtn.style.display = 'none';
+        
+        // Mostrar prompt nativo
+        deferredPrompt.prompt();
+        
+        // Aguardar escolha do usuário
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        if (outcome === 'accepted') {
+          console.log('✅ Usuário aceitou instalar o PWA');
+          showToast('🎉 Obrigado por instalar o app!', 4000);
+          isInstalled = true;
+        } else {
+          console.log('❌ Usuário recusou instalar o PWA');
+          showToast('💡 Você pode instalar depois pelo menu do navegador', 3000);
+          // Mostrar botão novamente após alguns dias
+          setTimeout(() => {
+            if (!isInstalled) {
+              installBtn.style.display = 'flex';
+            }
+          }, 7 * 24 * 60 * 60 * 1000); // 7 dias
+        }
+        
+        deferredPrompt = null;
+      };
+    });
+
+    // App instalado com sucesso
+    window.addEventListener('appinstalled', () => {
+      console.log('✅ App instalado com sucesso!');
+      isInstalled = true;
+      const installBtn = document.getElementById('install-prompt');
+      installBtn.style.display = 'none';
+      showToast('🎉 App instalado! Acesse pela tela inicial', 4000);
+    });
+
+    // Verificar conexão com internet
+    window.addEventListener('online', () => {
+      console.log('📡 Conexão restaurada');
+      showToast('📡 Conexão restaurada!', 2000);
+    });
+    
+    window.addEventListener('offline', () => {
+      console.log('⚠️ Sem conexão com internet');
+      showToast('⚠️ Sem internet - modo offline ativado', 3000);
+    });
+
+    // Salvar dados periodicamente
+    setInterval(() => {
+      const moedasAtual = Number(localStorage.getItem("moedasTotal")) || 0;
+      if (moedasAtual !== moedasTotal) {
+        localStorage.setItem("moedasTotal", moedasAtual);
+        document.getElementById("moedasDisplay").innerHTML = "🪙 " + moedasAtual.toFixed(2);
+      }
+    }, 1000);
+
+    // Prevenir cache problemático - limpar cache antigo se necessário
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(key => {
+          if (key.includes('farmacao-aura') && !key.includes('v1')) {
+            caches.delete(key);
+            console.log('🗑️ Cache antigo removido:', key);
+          }
+        });
+      });
+    }
+
+    // Analytics simples (opcional)
+    function trackEvent(eventName) {
+      console.log(`📊 Evento: ${eventName}`);
+      // Aqui você pode adicionar Google Analytics ou similar
+    }
+
+    // Track de cliques nos botões
+    document.querySelectorAll('.btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const action = e.target.innerText.trim();
+        trackEvent(`click_${action}`);
+      });
+    });
+
+    // Carregamento da página
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 Farmação de Aura carregado!');
+      trackEvent('page_view');
+    });
+  </script>
+
+</body>
+</html>
